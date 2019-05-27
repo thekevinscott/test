@@ -1,0 +1,100 @@
+<!doctype html>
+
+<html lang="en">
+
+<head>
+
+    <meta charset="utf-8">
+
+    <title></title>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/1.1.2/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@0.2.2"> </script> 
+
+</head>
+
+<body>
+
+
+    <img id="test" src="test.jpg">
+
+
+
+</body>
+<script>
+
+function loadImage(src) {
+    return tf.browser.fromPixels(document.getElementById('test'))
+}
+
+function cropImage(img) {
+    const width = img.shape[0];
+    const height = img.shape[1];
+  
+    // use the shorter side as the size to which we will crop
+    const shorterSide = Math.min(img.shape[0], img.shape[1]);
+  
+    // calculate beginning and ending crop points
+    const startingHeight = (height - shorterSide) / 2;
+    const startingWidth = (width - shorterSide) / 2;
+    const endingHeight = startingHeight + shorterSide;
+    const endingWidth = startingWidth + shorterSide;
+  
+    // return image data cropped to those points
+    return img.slice([startingWidth, startingHeight, 0], [endingWidth, endingHeight, 3]);
+  }
+
+function resizeImage(image) {
+    return tf.image.resizeBilinear(image, [224, 224]);
+  }
+
+  function batchImage(image) {
+    // Expand our tensor to have an additional dimension, whose size is 1
+    const batchedImage = image.expandDims(0);
+  
+    // Turn pixel data into a float between -1 and 1.
+    return batchedImage.toFloat().div(tf.scalar(127)).sub(tf.scalar(1));
+  }
+
+  function loadAndProcessImage(image) {
+    const croppedImage = cropImage(image);
+    const resizedImage = resizeImage(croppedImage);
+    const batchedImage = batchImage(resizedImage);
+    return batchedImage;
+  }
+
+  
+
+//start();
+
+let truncatedMobileNet;
+let model;
+async function loadTruncatedMobileNet() {
+  const mobilenet = await tf.loadLayersModel(
+      'ml-classifier-Super_Galaxy-Super_Snow.json');
+
+  // Return a model that outputs an internal activation.
+  const layer = mobilenet.getLayer('flatten_Flatten1');
+  return tf.model({inputs: mobilenet.inputs, outputs: layer.output});
+}
+
+
+  async function start() {
+    truncatedMobileNet = await loadTruncatedMobileNet();
+    const img = loadAndProcessImage(tf.browser.fromPixels(document.getElementById('test')));
+
+    const embeddings = truncatedMobileNet.predict(img);
+
+    // Make a prediction through our newly-trained model using the embeddings
+    // from mobilenet as input.
+    const predictions = model.predict(embeddings);
+
+    // Returns the index with the maximum probability. This number corresponds
+    // to the class the model thinks is the most probable given the input.
+    console.log(predictions.as1D().argMax());
+
+  }
+  start();
+</script>
+
+</html>
